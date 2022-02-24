@@ -20,6 +20,8 @@ struct PriceData {
 interface AggregatorValidatorInterface {
     
     function latestAnswer() external view returns(int256);
+
+    function latestRoundData() external view returns(uint80, int256, uint256, uint256, uint80);
     
 }
 
@@ -280,7 +282,7 @@ contract UniswapAnchoredView is  UniswapConfig, Ownable {
         }
         else if(config.priceSource == PriceSource.CHAINLINK){
 
-          int256 currentAnswer = (AggregatorValidatorInterface(config.reporter).latestAnswer());
+          (,int256 currentAnswer,,,) = (AggregatorValidatorInterface(config.reporter).latestRoundData());
           (,uint256 reportedPrice) = convertReportedPrice(config, currentAnswer);
           prices[config.symbolHash].price = uint248(reportedPrice);
           emit PriceUpdated(config.symbolHash, reportedPrice);
@@ -290,7 +292,7 @@ contract UniswapAnchoredView is  UniswapConfig, Ownable {
         }
 
         
-        int256 currentAnswer = (AggregatorValidatorInterface(config.reporter).latestAnswer());
+        (,int256 currentAnswer,,,) = (AggregatorValidatorInterface(config.reporter).latestRoundData());
         (Error error2,uint256 reportedPrice) = convertReportedPrice(config, currentAnswer);
         
         if(error2 != Error.NO_ERROR){
