@@ -1,9 +1,5 @@
 /**
- *Submitted for verification at BscScan.com on 2021-11-20
-*/
-
-/**
- *Submitted for verification at BscScan.com on 2021-11-17
+ *Submitted for verification at BscScan.com on 2022-02-04
 */
 
 pragma solidity ^0.5.16;
@@ -119,6 +115,16 @@ contract PlanetStorage {
     
 }
 
+contract PlanetStoragev1 is PlanetStorage {
+
+    address public implementation;
+
+    address public infinityVault;
+
+    event InfinityVaultChanged(address oldInfinityVault,address newInfinityVault);
+
+}
+
 contract PlanetDelegationStorage {
     /**
      * @notice Implementation address for this contract
@@ -138,7 +144,6 @@ contract PlanetDelegatorInterface is PlanetDelegationStorage {
      */
     function _setImplementation(address implementation_) public;
 }
-
 
 contract ExponentialNoError {
     uint constant expScale = 1e18;
@@ -731,22 +736,31 @@ contract GToken {
 
 }
 
-contract PlanetDiscountDelegate is PlanetStorage,Exponential{
+contract InfinityVault {
+
+    function getUserGtokenBal(address user) external view returns(uint);
+
+}
+
+contract PlanetDiscountDelegate is PlanetStoragev1,Exponential{
     
-    function changeAddress(address _newgGammaAddress,address _newGammatroller,address _newOracle) public returns(bool){
+    function changeAddress(address _newgGammaAddress,address _newGammatroller,address _newOracle,address _newInfinityVault) public returns(bool){
         
         require(msg.sender == admin, "only admin can call");
         address _gGammaAddress = gGammaAddress;
         address _gammatroller = gammatroller;
         address _oracle = oracle;
+        address _infinityVault = infinityVault;
         
         gGammaAddress = _newgGammaAddress;
         gammatroller = _newGammatroller;
         oracle = _newOracle;
+        infinityVault = _newInfinityVault;
         
         emit gGammaAddressChange(_gGammaAddress,_newgGammaAddress);
         emit gammatrollerChange(_gammatroller,_newGammatroller);
         emit oracleChanged(_oracle,_newOracle);
+        emit InfinityVaultChanged(_infinityVault,_newInfinityVault);
         return true;
     }
     
@@ -809,8 +823,15 @@ contract PlanetDiscountDelegate is PlanetStorage,Exponential{
         //scaled upto 2 decimal like if 50% then output is 5000
        
         GToken[] memory userInMarkets = GammatrollerInterface(gammatroller).getAllMarkets();
+
+        (,uint gTokenBalance,,uint exchangeRate) = GToken(gGammaAddress).getAccountSnapshot(borrower);
+        uint price = PriceOracle(oracle).getUnderlyingPrice(GToken(gGammaAddress));
         
-        uint256 gammaStaked = returnBorrowerStakedAsset(borrower,gGammaAddress);
+        gTokenBalance = gTokenBalance + InfinityVault(infinityVault).getUserGtokenBal(borrower);
+        
+        (,uint256 gammaStaked) = mulScalarTruncate(Exp({mantissa: gTokenBalance}), exchangeRate);
+        (,gammaStaked) = mulScalarTruncate(Exp({mantissa: gammaStaked}), price);
+        
         uint256 otherStaked = 0; 
         
         for(uint i = 0; i < userInMarkets.length ;i++){
